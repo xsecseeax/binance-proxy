@@ -3,25 +3,26 @@ import requests
 
 app = Flask(__name__)
 
-ENDPOINTS = [
-    "https://fapi.binance.com/fapi/v1/ticker/price",
-    "https://api.binance.com/api/v3/ticker/price",
-]
-
 @app.route("/prices")
 def get_prices():
-    for url in ENDPOINTS:
-        try:
-            resp = requests.get(url, timeout=10, headers={
-                "User-Agent": "Mozilla/5.0"
-            })
-            if resp.status_code == 200:
-                data = resp.json()
-                prices = {item["symbol"]: float(item["price"]) for item in data}
-                return jsonify({"status": "ok", "prices": prices, "source": url})
-        except Exception as e:
-            continue
-    return jsonify({"status": "error", "msg": "All endpoints failed"}), 500
+    try:
+        # CoinCap - tüm kripto fiyatları, bloke yok
+        resp = requests.get(
+            "https://api.coincap.io/v2/assets?limit=2000",
+            timeout=15
+        )
+        if resp.status_code != 200:
+            return jsonify({"status": "error", "code": resp.status_code}), 500
+        data = resp.json().get("data", [])
+        prices = {}
+        for item in data:
+            symbol = (item.get("symbol") or "").upper() + "USDT"
+            price = item.get("priceUsd")
+            if price:
+                prices[symbol] = float(price)
+        return jsonify({"status": "ok", "prices": prices})
+    except Exception as e:
+        return jsonify({"status": "error", "msg": str(e)}), 500
 
 @app.route("/")
 def index():
